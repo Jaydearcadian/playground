@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RJP Observatory Bundle Inspector</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b1020; color:#d8e1ff; margin:0; }
+    .wrap { padding:16px; max-width:1200px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .card { background:#11182e; border:1px solid #223; padding:12px; border-radius:8px; }
+    input,button,textarea { background:#0f1630; color:#d8e1ff; border:1px solid #2a3560; padding:8px; border-radius:6px; }
+    button { cursor:pointer; }
+    .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+    .tab { padding:6px 10px; }
+    .tab.active { background:#30418a; }
+    pre { white-space:pre-wrap; word-break:break-word; background:#0a1125; padding:10px; border-radius:6px; max-height:420px; overflow:auto; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .full { width:100%; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h2>RJP Observatory Bundle Inspector (Base Mainnet)</h2>
+  <div class="card">
+    <div class="row">
+      <input id="rpc" size="48" placeholder="RPC URL" />
+      <input id="subject" placeholder="optional subject 0x..." size="44" />
+      <button id="run">Run Observatory</button>
+      <button id="seed">Load Seed Sample</button>
+    </div>
+    <div class="row">
+      <button id="verifyManifest">Verify Manifest</button>
+      <button id="verifyRoot">Verify Root</button>
+      <button id="download">Download Bundle JSON</button>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:10px">
+    <div class="card"><div>Evidence Items</div><h3 id="c1">0</h3></div>
+    <div class="card"><div>Leaf Hashes</div><h3 id="c2">0</h3></div>
+    <div class="card"><div>Proofs</div><h3 id="c3">0</h3></div>
+    <div class="card"><div>Verification</div><h3 id="c4">idle</h3></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="card"><pre id="out"></pre></div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Verification Console (Proof)</h3>
+    <div class="row">
+      <input id="proofIndex" placeholder="leaf index" />
+      <button id="verifyProof">Verify Proof by Index</button>
+    </div>
+    <pre id="proofResult"></pre>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h3>Raw Log Workbench</h3>
+    <textarea id="rawLogs" rows="5" class="full" placeholder='[{"topics":[],"data":"0x0"}]'></textarea>
+    <button id="decode" style="margin-top:8px">Decode Logs</button>
+  </div>
+</div>
+<script>
+const tabs = ['Manifest','Evidence Items','Leaf Hashes','Merkle Visualizer','Proofs','Features','Debug','Raw Log Workbench'];
+const tabEl = document.getElementById('tabs');
+const out = document.getElementById('out');
+let active='Manifest';
+let bundle = null;
+
+function renderTabs(){
+  tabEl.innerHTML='';
+  tabs.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='tab'+(t===active?' active':'');
+    b.textContent=t;
+    b.onclick=()=>{active=t; render()};
+    tabEl.appendChild(b);
+  });
+}
+
+function render(){
+  renderTabs();
+  if(!bundle){ out.textContent='No bundle loaded'; return; }
+  const map={
+    'Manifest':bundle.manifest,
+    'Evidence Items':bundle.evidence_items,
+    'Leaf Hashes':bundle.leaf_hashes,
+    'Merkle Visualizer':{root:bundle.manifest?.evidence_root, nodes:bundle.proofs?.slice(0,3)},
+    'Proofs':bundle.proofs,
+    'Features':bundle.features,
+    'Debug':bundle
+  };
+  out.textContent = JSON.stringify(map[active]||{},null,2);
+  c1.textContent=bundle.evidence_items?.length||0;
+  c2.textContent=bundle.leaf_hashes?.length||0;
+  c3.textContent=bundle.proofs?.length||0;
+}
+
+run.onclick=async()=>{
+  const r=await fetch('/observatory/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({rpc_url:rpc.value,subject:subject.value||undefined})});
+  bundle=await r.json(); active='Manifest'; render();
+};
+seed.onclick=async()=>{ const r=await fetch('/sample-bundle.json'); bundle=await r.json(); render(); };
+verifyManifest.onclick=async()=>{
+  if(!bundle?.manifest) return;
+  const r=await fetch('/observatory/verify-manifest',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({manifest:bundle.manifest})});
+  const j=await r.json(); c4.textContent=j.is_valid?'manifest ok':'manifest fail';
+};
+verifyRoot.onclick=async()=>{
+  if(!bundle?.leaf_hashes) return;
+  const r=await fetch('/observatory/verify-root',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leaf_hashes:bundle.leaf_hashes,evidence_root:bundle.manifest?.evidence_root})});
+  const j=await r.json(); c4.textContent=j.is_valid?'root ok':'root fail';
+};
+verifyProof.onclick=async()=>{
+  const idx = Number(proofIndex.value || '0');
+  const proof = bundle?.proofs?.[idx];
+  if(!proof || !bundle?.manifest?.evidence_root){ proofResult.textContent='Missing proof/root'; return; }
+  const r=await fetch('/observatory/verify-proof',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leaf_hash:proof.leaf_hash,path:proof.path,root:bundle.manifest.evidence_root})});
+  proofResult.textContent=JSON.stringify(await r.json(),null,2);
+};
+download.onclick=()=>{
+  if(!bundle) return;
+  const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='observatory-bundle.json'; a.click();
+};
+decode.onclick=async()=>{ const logs=JSON.parse(rawLogs.value||'[]'); const r=await fetch('/logs/decode',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({logs})}); out.textContent=JSON.stringify(await r.json(),null,2); };
+render();
+</script>
+</body>
+</html>
