@@ -7,6 +7,7 @@
   <style>
     body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b1020; color:#d8e1ff; margin:0; }
     .wrap { padding:16px; max-width:1280px; margin:0 auto; }
+    .wrap { padding:16px; max-width:1200px; margin:0 auto; }
     .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
     .card { background:#11182e; border:1px solid #223; padding:12px; border-radius:8px; }
     input,button,textarea { background:#0f1630; color:#d8e1ff; border:1px solid #2a3560; padding:8px; border-radius:6px; }
@@ -25,6 +26,8 @@
     .pulse { animation:pulse 1.2s infinite; }
     @keyframes pulse { 0%{opacity:.7} 50%{opacity:1} 100%{opacity:.7} }
     #graph { width:100%; height:420px; background:#0a1125; border-radius:8px; border:1px solid #27315a; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .full { width:100%; }
   </style>
 </head>
 <body>
@@ -34,6 +37,8 @@
     <div class="row">
       <input id="rpc" size="42" value="https://mainnet.base.org" placeholder="RPC URL" />
       <input id="subject" placeholder="subject address (optional)" size="44" />
+      <input id="rpc" size="48" placeholder="RPC URL" />
+      <input id="subject" placeholder="optional subject 0x..." size="44" />
       <button id="run">Run Observatory</button>
       <button id="seed">Load Seed Sample</button>
     </div>
@@ -44,6 +49,7 @@
       <span id="statusText" class="status">idle</span>
     </div>
     <div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div>
+    </div>
   </div>
 
   <div class="grid" style="margin-top:10px">
@@ -107,6 +113,8 @@ function stopProgress(success=true) {
   progressBar.classList.remove('pulse');
   progressBar.style.width = success ? '100%' : '0%';
 }
+let active='Manifest';
+let bundle = null;
 
 function renderTabs(){
   tabEl.innerHTML='';
@@ -162,6 +170,9 @@ function drawGraph() {
 function render(){
   renderTabs();
   if(!bundle){ out.textContent='No bundle loaded'; drawGraph(); return; }
+function render(){
+  renderTabs();
+  if(!bundle){ out.textContent='No bundle loaded'; return; }
   const map={
     'Manifest':bundle.manifest,
     'Evidence Items':bundle.evidence_items,
@@ -171,6 +182,10 @@ function render(){
     'Features':bundle.features,
     'Debug':bundle,
     'Raw Log Workbench': {hint:'Use decoder below.'}
+    'Merkle Visualizer':{root:bundle.manifest?.evidence_root, nodes:bundle.proofs?.slice(0,3)},
+    'Proofs':bundle.proofs,
+    'Features':bundle.features,
+    'Debug':bundle
   };
   out.textContent = JSON.stringify(map[active]||{},null,2);
   c1.textContent=bundle.evidence_items?.length||0;
@@ -219,6 +234,23 @@ verifyRoot.onclick=async()=>{
   c4.textContent=j.is_valid?'root ok':'root fail';
 };
 
+}
+
+run.onclick=async()=>{
+  const r=await fetch('/observatory/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({rpc_url:rpc.value,subject:subject.value||undefined})});
+  bundle=await r.json(); active='Manifest'; render();
+};
+seed.onclick=async()=>{ const r=await fetch('/sample-bundle.json'); bundle=await r.json(); render(); };
+verifyManifest.onclick=async()=>{
+  if(!bundle?.manifest) return;
+  const r=await fetch('/observatory/verify-manifest',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({manifest:bundle.manifest})});
+  const j=await r.json(); c4.textContent=j.is_valid?'manifest ok':'manifest fail';
+};
+verifyRoot.onclick=async()=>{
+  if(!bundle?.leaf_hashes) return;
+  const r=await fetch('/observatory/verify-root',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leaf_hashes:bundle.leaf_hashes,evidence_root:bundle.manifest?.evidence_root})});
+  const j=await r.json(); c4.textContent=j.is_valid?'root ok':'root fail';
+};
 verifyProof.onclick=async()=>{
   const idx = Number(proofIndex.value || '0');
   const proof = bundle?.proofs?.[idx];
@@ -244,6 +276,7 @@ decode.onclick=async()=>{
 };
 
 subject.oninput = drawGraph;
+decode.onclick=async()=>{ const logs=JSON.parse(rawLogs.value||'[]'); const r=await fetch('/logs/decode',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({logs})}); out.textContent=JSON.stringify(await r.json(),null,2); };
 render();
 </script>
 </body>
