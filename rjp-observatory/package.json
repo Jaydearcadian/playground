@@ -1,0 +1,8 @@
+{
+  "name": "rjp-observatory-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:phase1": "node --test packages/shared-schemas/test/*.test.js"
+  }
+}
