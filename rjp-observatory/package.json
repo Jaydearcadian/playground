@@ -1,0 +1,16 @@
+{
+  "name": "rjp-observatory-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:phase1": "node --test packages/shared-schemas/test/*.test.js",
+    "test:phase2": "node --test packages/merkle-verifier/test/*.test.js",
+    "test:phases12": "node --test packages/shared-schemas/test/*.test.js packages/merkle-verifier/test/*.test.js",
+    "test:phase3": "node --test packages/rpc-connectors/test/*.test.js packages/observatory-core/test/*.test.js",
+    "test:phases123": "node --test packages/shared-schemas/test/*.test.js packages/merkle-verifier/test/*.test.js packages/rpc-connectors/test/*.test.js packages/observatory-core/test/*.test.js",
+    "test:phase4": "node --test packages/feature-deriver/test/*.test.js",
+    "test:phases1234": "node --test packages/shared-schemas/test/*.test.js packages/merkle-verifier/test/*.test.js packages/rpc-connectors/test/*.test.js packages/observatory-core/test/*.test.js packages/feature-deriver/test/*.test.js",
+    "test:phase5": "node --test apps/bundle-inspector-web/test/*.test.js",
+    "test:phases12345": "node --test packages/shared-schemas/test/*.test.js packages/merkle-verifier/test/*.test.js packages/rpc-connectors/test/*.test.js packages/observatory-core/test/*.test.js packages/feature-deriver/test/*.test.js apps/bundle-inspector-web/test/*.test.js"
+  }
+}
