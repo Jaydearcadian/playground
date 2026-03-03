@@ -6,9 +6,9 @@ import { decodeLog } from '../src/decode.js';
 import { computeManifestHash } from '../src/canonical.js';
 import { computeMerkleRoot, verifyProof, buildProofs } from '../src/merkle.js';
 
-test('hashing deterministic for empty and abc', () => {
-  assert.equal(keccak256Hex(Buffer.alloc(0)).startsWith('0x'), true);
-  assert.equal(keccak256Hex('abc').length, 66);
+test('keccak vector and empty hash are Ethereum-compatible', () => {
+  assert.equal(keccak256Hex(Buffer.alloc(0)), '0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470');
+  assert.equal(keccak256Hex('abc'), '0x4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45');
 });
 
 test('topic validation', () => {
@@ -16,15 +16,16 @@ test('topic validation', () => {
   assert.equal(validateTopic('0xabc'), false);
 });
 
-test('log decoding transfer and malformed topic safety', () => {
-  const d = decodeLog({
+test('log decoding transfer and invalid topic safety', () => {
+  const log = {
     topics: [
       '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
       '0x0000000000000000000000001111111111111111111111111111111111111111',
       '0x0000000000000000000000002222222222222222222222222222222222222222',
     ],
     data: '0x0f',
-  });
+  };
+  const d = decodeLog(log);
   assert.equal(d.type, 'ERC20_TRANSFER');
   assert.equal(d.value, '15');
   assert.equal(decodeLog({ topics: ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'] }).from, null);
@@ -37,9 +38,15 @@ test('manifest hash deterministic and ignores manifest_hash field', () => {
 });
 
 test('root recomputation and proof verification', () => {
-  const leaves = ['0x' + '1'.repeat(64), '0x' + '2'.repeat(64), '0x' + '3'.repeat(64)];
+  const leaves = [
+    '0x' + '1'.repeat(64),
+    '0x' + '2'.repeat(64),
+    '0x' + '3'.repeat(64),
+  ];
   const root = computeMerkleRoot(leaves);
   const proofs = buildProofs(leaves);
-  assert.equal(verifyProof(proofs[0].leaf_hash, proofs[0].path, root).is_valid, true);
-  assert.equal(verifyProof(proofs[0].leaf_hash, proofs[0].path, '0x' + '0'.repeat(64)).is_valid, false);
+  const ok = verifyProof(proofs[0].leaf_hash, proofs[0].path, root);
+  assert.equal(ok.is_valid, true);
+  const bad = verifyProof(proofs[0].leaf_hash, proofs[0].path, '0x' + '0'.repeat(64));
+  assert.equal(bad.is_valid, false);
 });
