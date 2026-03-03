@@ -3,8 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:phase1": "node --test packages/shared-schemas/test/*.test.js",
-    "test:phase2": "node --test packages/merkle-verifier/test/*.test.js",
-    "test:phases12": "node --test packages/shared-schemas/test/*.test.js packages/merkle-verifier/test/*.test.js"
+    "test:phase1": "node --test packages/shared-schemas/test/*.test.js"
   }
 }

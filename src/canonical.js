@@ -1,16 +1,16 @@
 import { keccak256Hex } from './hash.js';
 
-function normalize(v) {
-  if (Array.isArray(v)) return v.map(normalize);
-  if (v && typeof v === 'object') {
+function sanitize(value) {
+  if (Array.isArray(value)) return value.map(sanitize);
+  if (value && typeof value === 'object') {
     const out = {};
-    for (const k of Object.keys(v).sort()) {
-      if (k === 'manifest_hash' || v[k] === undefined) continue;
-      out[k] = normalize(v[k]);
+    for (const [k, v] of Object.entries(value)) {
+      if (k === 'manifest_hash' || v === undefined) continue;
+      out[k] = sanitize(v);
     }
     return out;
   }
-  return v;
+  return value;
 }
 
 export function canonicalize(value) {
@@ -23,5 +23,5 @@ export function canonicalize(value) {
 }
 
 export function computeManifestHash(manifest) {
-  return keccak256Hex(canonicalize(normalize(manifest)));
+  return keccak256Hex(canonicalize(sanitize(manifest)));
 }
