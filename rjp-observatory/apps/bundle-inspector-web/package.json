@@ -1,0 +1,9 @@
+{
+  "name": "@rjp/bundle-inspector-web",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/ui-model.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

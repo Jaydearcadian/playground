@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bundle Inspector Web</title>
+  <style>
+    body{margin:0;background:#0b1020;color:#d8e1ff;font-family:ui-monospace,monospace}
+    .wrap{max-width:1280px;margin:0 auto;padding:16px}
+    .card{background:#11182e;border:1px solid #223;border-radius:8px;padding:12px;margin-top:10px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,button,textarea{background:#0f1630;color:#d8e1ff;border:1px solid #2a3560;border-radius:6px;padding:8px}
+    button{cursor:pointer}
+    pre{white-space:pre-wrap;overflow:auto;max-height:420px;background:#0a1125;border-radius:6px;padding:10px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}.tab.active{background:#30418a}
+    .progress{height:8px;border-radius:999px;background:#0a1125;border:1px solid #27315a;overflow:hidden}
+    .progress>div{height:100%;width:0%;background:linear-gradient(90deg,#3d67ff,#31c5ff,#6de2a7);transition:width .35s}
+    #graph{width:100%;height:380px;background:#0a1125;border:1px solid #27315a;border-radius:8px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h2>RJP Bundle Inspector Web (Phase 5)</h2>
+  <div class="card">
+    <div class="row">
+      <input id="api" size="36" value="/observatory/run" />
+      <input id="rpc" size="36" value="https://mainnet.base.org" />
+      <input id="subject" size="36" placeholder="optional subject 0x..." />
+      <button id="run">Run Observatory</button>
+      <button id="seed">Load Seed</button>
+      <button id="download">Download Artifacts</button>
+      <span id="status">idle</span>
+    </div>
+    <div class="progress" style="margin-top:8px"><div id="bar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <pre id="out">No data loaded</pre>
+  </div>
+
+  <div class="card">
+    <h3>Merkle / Subject Knowledge Graph</h3>
+    <div id="graph"></div>
+  </div>
+
+  <div class="card">
+    <h3>Debug Console</h3>
+    <div class="row">
+      <button id="verifyManifest">Verify Manifest</button>
+      <button id="verifyRoot">Verify Root</button>
+      <input id="proofIndex" placeholder="proof index" />
+      <button id="verifyProof">Verify Proof</button>
+    </div>
+    <pre id="debugOut"></pre>
+  </div>
+
+  <div class="card">
+    <h3>Raw Log Workbench</h3>
+    <textarea id="rawLogs" rows="5" style="width:100%" placeholder='[{"topics":[],"data":"0x0"}]'></textarea>
+    <button id="decode" style="margin-top:8px">Decode Logs</button>
+  </div>
+</div>
+<script>
+const tabs=['Manifest','Evidence Items','Leaf Hashes','Merkle Visualizer','Proofs','Features','Debug','Raw Log Workbench'];
+let active='Manifest', bundle=null, timer=null;
+const out=document.getElementById('out'), tabsEl=document.getElementById('tabs'), bar=document.getElementById('bar');
+const statusEl=document.getElementById('status'), debugOut=document.getElementById('debugOut');
+
+function setStatus(s){ statusEl.textContent=s; }
+function startProgress(){ const pts=[7,16,30,44,61,77,90]; let i=0; bar.style.width='2%'; clearInterval(timer); timer=setInterval(()=>{ if(i<pts.length) bar.style.width=pts[i++]+'%'; },450); }
+function stopProgress(ok=true){ clearInterval(timer); bar.style.width=ok?'100%':'0%'; }
+
+function tabData(tab){
+  if(!bundle) return null;
+  return {
+    'Manifest':bundle.manifest,
+    'Evidence Items':bundle.evidence_items,
+    'Leaf Hashes':bundle.leaf_hashes,
+    'Merkle Visualizer':{ root:bundle?.manifest?.evidence_root, proofs:bundle?.proofs?.slice(0,3)},
+    'Proofs':bundle.proofs,
+    'Features':bundle.features,
+    'Debug':bundle,
+    'Raw Log Workbench':{hint:'Use decode panel below'}
+  }[tab];
+}
+
+function renderTabs(){ tabsEl.innerHTML=''; tabs.forEach(t=>{ const b=document.createElement('button'); b.textContent=t; b.className='tab'+(active===t?' active':''); b.onclick=()=>{active=t; render()}; tabsEl.appendChild(b); }); }
+
+function renderGraph(){
+  const host=document.getElementById('graph');
+  if(!bundle?.evidence_items?.length){ host.innerHTML='<div style="padding:12px;opacity:.8">Run observatory to populate graph</div>'; return; }
+  const focus=(subject.value||bundle.evidence_items[0].from||bundle.evidence_items[0].owner||'subject').toLowerCase();
+  const peers=new Map();
+  for(const ev of bundle.evidence_items.slice(0,60)){
+    for(const k of ['from','to','owner','spender']){
+      const v=ev[k]?.toLowerCase(); if(!v||v===focus) continue;
+      peers.set(v,{label:v,count:(peers.get(v)?.count||0)+1,type:ev.evidence_type});
+    }
+  }
+  const nodes=[...peers.values()].slice(0,12),w=host.clientWidth||1000,h=380,cx=w/2,cy=h/2;
+  let svg=`<svg width="${w}" height="${h}">`;
+  svg+=`<circle cx="${cx}" cy="${cy}" r="48" fill="#273e9d"/><text x="${cx}" y="${cy+4}" fill="#fff" text-anchor="middle" font-size="10">${focus.slice(0,14)}...</text>`;
+  nodes.forEach((n,i)=>{const a=(Math.PI*2*i)/Math.max(nodes.length,1),x=cx+Math.cos(a)*145,y=cy+Math.sin(a)*120;
+    svg+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#4960d2"/>`;
+    svg+=`<circle cx="${x}" cy="${y}" r="30" fill="#1b2550" stroke="#4d6bff"/>`;
+    svg+=`<text x="${x}" y="${y-2}" fill="#d8e1ff" text-anchor="middle" font-size="9">${n.label.slice(0,10)}...</text>`;
+    svg+=`<text x="${x}" y="${y+11}" fill="#8fb1ff" text-anchor="middle" font-size="8">${n.type}:${n.count}</text>`;
+  });
+  svg+='</svg>'; host.innerHTML=svg;
+}
+
+function render(){ renderTabs(); out.textContent=JSON.stringify(tabData(active)||'No data loaded',null,2); renderGraph(); }
+
+run.onclick=async()=>{
+  setStatus('running...'); startProgress();
+  try{
+    const res=await fetch('/observatory/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({rpc_url:rpc.value,subject:subject.value||undefined})});
+    const json=await res.json(); if(!res.ok||json.error) throw new Error(json.error||'run failed');
+    bundle=json; active='Manifest'; render(); setStatus('done'); stopProgress(true);
+  }catch(e){ setStatus('error: '+e.message); stopProgress(false); }
+};
+
+seed.onclick=async()=>{ bundle=await (await fetch('/sample-bundle.json')).json(); active='Manifest'; render(); setStatus('seed loaded'); stopProgress(true); };
+
+download.onclick=()=>{ if(!bundle) return; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'})); a.download='observatory-bundle.json'; a.click(); };
+verifyManifest.onclick=async()=>{ if(!bundle?.manifest) return; debugOut.textContent=JSON.stringify(await (await fetch('/observatory/verify-manifest',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({manifest:bundle.manifest})})).json(),null,2); };
+verifyRoot.onclick=async()=>{ if(!bundle?.leaf_hashes) return; debugOut.textContent=JSON.stringify(await (await fetch('/observatory/verify-root',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leaf_hashes:bundle.leaf_hashes,evidence_root:bundle?.manifest?.evidence_root})})).json(),null,2); };
+verifyProof.onclick=async()=>{ const p=bundle?.proofs?.[Number(proofIndex.value||'0')]; if(!p||!bundle?.manifest?.evidence_root) return; debugOut.textContent=JSON.stringify(await (await fetch('/observatory/verify-proof',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({leaf_hash:p.leaf_hash,path:p.path,root:bundle.manifest.evidence_root})})).json(),null,2); };
+
+decode.onclick=async()=>{ try{ const logs=JSON.parse(rawLogs.value||'[]'); debugOut.textContent=JSON.stringify(await (await fetch('/logs/decode',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({logs})})).json(),null,2); }catch(e){ debugOut.textContent='decode error: '+e.message; } };
+subject.oninput=renderGraph;
+render();
+</script>
+</body>
+</html>
