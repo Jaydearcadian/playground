@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RJP Observatory Bundle Inspector</title>
+  <style>
+    body { margin:0; background:#0b1020; color:#d8e1ff; font-family: ui-monospace, monospace; }
+    .wrap { max-width:1200px; margin:0 auto; padding:16px; }
+    .card { background:#11182e; border:1px solid #223; border-radius:8px; padding:12px; margin-top:10px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input,button,textarea { background:#0f1630; color:#d8e1ff; border:1px solid #2a3560; border-radius:6px; padding:8px; }
+    button { cursor:pointer; }
+    pre { white-space:pre-wrap; overflow:auto; max-height:420px; background:#0a1125; border-radius:6px; padding:10px; }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; }
+    .tab.active { background:#30418a; }
+    .progress { height:8px; border-radius:999px; background:#0a1125; overflow:hidden; border:1px solid #27315a; }
+    .progress > div { height:100%; width:0%; background:linear-gradient(90deg,#3d67ff,#6de2a7); transition:width .35s ease; }
+    #graph { width:100%; height:380px; background:#0a1125; border:1px solid #27315a; border-radius:8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h2>RJP Observatory Bundle Inspector</h2>
+
+  <div class="card">
+    <div class="row">
+      <input id="rpc" value="https://mainnet.base.org" size="42" />
+      <input id="subject" placeholder="optional subject 0x..." size="42" />
+      <button id="run">Run Observatory</button>
+      <button id="seed">Load Seed</button>
+      <span id="status">idle</span>
+    </div>
+    <div class="progress" style="margin-top:8px"><div id="bar"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <pre id="out">No bundle loaded</pre>
+  </div>
+
+  <div class="card">
+    <h3>Knowledge Graph (Subject ↔ Evidence)</h3>
+    <div id="graph"></div>
+  </div>
+</div>
+<script>
+const tabs=['Manifest','Evidence Items','Leaf Hashes','Proofs','Features','Debug'];
+let bundle=null, active='Manifest', timer=null;
+const out=document.getElementById('out');
+const tabsEl=document.getElementById('tabs');
+const bar=document.getElementById('bar');
+
+function setStatus(t){ document.getElementById('status').textContent=t; }
+function startProgress(){ const pts=[8,18,34,52,66,79,92]; let i=0; bar.style.width='2%'; clearInterval(timer); timer=setInterval(()=>{ if(i<pts.length) bar.style.width=pts[i++]+'%'; },500); }
+function stopProgress(ok=true){ clearInterval(timer); bar.style.width=ok?'100%':'0%'; }
+
+function renderTabs(){ tabsEl.innerHTML=''; tabs.forEach(t=>{ const b=document.createElement('button'); b.className='tab'+(t===active?' active':''); b.textContent=t; b.onclick=()=>{active=t; render()}; tabsEl.appendChild(b); }); }
+
+function renderGraph(){
+  const host=document.getElementById('graph');
+  if(!bundle?.evidence_items?.length){ host.innerHTML='<div style="padding:12px;opacity:.8">Run observatory to render graph.</div>'; return; }
+  const focus=(subject.value||bundle.evidence_items[0]?.from||'subject').toLowerCase();
+  const peers=new Map();
+  for(const ev of bundle.evidence_items.slice(0,40)){
+    for(const k of ['from','to','owner','spender']){
+      const v=ev[k]; if(!v||v.toLowerCase()===focus) continue;
+      const key=v.toLowerCase(); peers.set(key,{label:v,count:(peers.get(key)?.count||0)+1,type:ev.evidence_type});
+    }
+  }
+  const nodes=[...peers.values()].slice(0,10), w=host.clientWidth||1000, h=380, cx=w/2, cy=h/2;
+  let svg=`<svg width="${w}" height="${h}">`;
+  svg+=`<circle cx="${cx}" cy="${cy}" r="50" fill="#273e9d"/><text x="${cx}" y="${cy+4}" fill="#fff" text-anchor="middle" font-size="11">${focus.slice(0,14)}...</text>`;
+  nodes.forEach((n,i)=>{const a=(Math.PI*2*i)/Math.max(nodes.length,1); const x=cx+Math.cos(a)*145; const y=cy+Math.sin(a)*125;
+    svg+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#4960d2"/>`;
+    svg+=`<circle cx="${x}" cy="${y}" r="32" fill="#1b2550" stroke="#4d6bff"/>`;
+    svg+=`<text x="${x}" y="${y-2}" fill="#d8e1ff" text-anchor="middle" font-size="9">${n.label.slice(0,10)}...</text>`;
+    svg+=`<text x="${x}" y="${y+11}" fill="#8fb1ff" text-anchor="middle" font-size="8">${n.type}:${n.count}</text>`;
+  });
+  svg+='</svg>'; host.innerHTML=svg;
+}
+
+function render(){
+  renderTabs();
+  if(!bundle){ out.textContent='No bundle loaded'; renderGraph(); return; }
+  const map={Manifest:bundle.manifest,'Evidence Items':bundle.evidence_items,'Leaf Hashes':bundle.leaf_hashes,Proofs:bundle.proofs,Features:bundle.features,Debug:bundle};
+  out.textContent=JSON.stringify(map[active],null,2);
+  renderGraph();
+}
+
+run.onclick=async()=>{
+  setStatus('running...'); startProgress();
+  try{
+    const r=await fetch('/observatory/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({rpc_url:rpc.value,subject:subject.value||undefined})});
+    const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||'run failed');
+    bundle=j; active='Manifest'; render(); setStatus('done'); stopProgress(true);
+  }catch(e){ setStatus('error: '+e.message); stopProgress(false); }
+};
+
+seed.onclick=async()=>{ bundle=await (await fetch('/sample-bundle.json')).json(); active='Manifest'; render(); setStatus('seed loaded'); stopProgress(true); };
+subject.oninput=renderGraph;
+render();
+</script>
+</body>
+</html>

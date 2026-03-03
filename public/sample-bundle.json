@@ -1,0 +1,19 @@
+{
+  "manifest": {
+    "schema_version": "1.0.0",
+    "domain": "EXECUTION_INTEGRITY_V1",
+    "chain_id": "8453",
+    "chain": "base-mainnet",
+    "token_contract": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "transfer_topic": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+    "approval_topic": "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+    "window": {"start_block":"100","end_block":"199","latest_block":"211","finality_depth":"12","window_size":"100"},
+    "counts": {"transfer_logs":"1","approval_logs":"1","evidence_items":"2"},
+    "evidence_root": "0x7f6f2906f1c9cdecd1f59f78c0934b90f2bfa18f73d5e537f5d3ce7f6d2ea7f5",
+    "generated_at": "2026-01-01T00:00:00.000Z"
+  },
+  "evidence_items": [],
+  "leaf_hashes": [],
+  "proofs": [],
+  "features": {"summary": {"distinct_transactions":"0","transfer_count":"0","approval_count":"0"}}
+}
