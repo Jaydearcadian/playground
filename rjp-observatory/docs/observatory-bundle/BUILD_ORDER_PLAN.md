@@ -31,7 +31,7 @@ rjp-observatory/
 
 ## Phase sequence
 
-## Phase 0 — Planning + Skill Setup (completed)
+## Phase 0 — Planning + Skill Setup (current)
 - Create monorepo skeleton.
 - Define implementation skills and QA gates.
 - Write this build-order plan.
@@ -126,5 +126,7 @@ Exit criteria:
 - UI smoke test (including progress + graph rendering)
 - Documentation updated for changed behavior
 
-## Phase status note
-- Phases 0–6 have implementation coverage in this repository; keep this plan as sequencing reference for future rebuilds.
+## Immediate next actions
+1. Add `.env.example` and root README for monorepo bootstrap.
+2. Create package READMEs and entrypoints.
+3. Implement shared schemas first, then crypto core.
