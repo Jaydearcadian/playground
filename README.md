@@ -76,3 +76,13 @@ npm test
 ## Verification notes
 - Hashing uses Ethereum-compatible Keccak-256 for manifest, leaves, and Merkle nodes.
 - Verification endpoints validate payload shape (32-byte hex hashes and proof path positions).
+
+
+## Extended documentation
+- Technical explainer / whitepaper: `docs/OBSERVATORY_WHITEPAPER.md`
+
+
+## Mobile access troubleshooting
+- If `Run Observatory` appears idle, confirm the status label/progress bar updates in the UI and check browser console/network for `/observatory/run` errors.
+- If testing from phone, ensure your runtime URL is publicly routable (Codespaces forwarded public port, tunnel URL, or same LAN reachable host).
+- Use `GET /health` first to validate server reachability before running ingestion.

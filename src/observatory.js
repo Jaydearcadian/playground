@@ -10,6 +10,7 @@ const DEFAULTS = {
   approval_topic: '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925',
   finality_depth: 12,
   window_size: 500,
+  rpc_url: 'https://mainnet.base.org',
 };
 
 const TOPIC_REGEX = /^0x[a-fA-F0-9]{64}$/; // trimmed topic validation regex
