@@ -37,27 +37,15 @@ contract PrivateProjectSettlementTest {
 
         vm.prank(CUSTOMER);
         uint256 dealId = settlement.createDeal(
-            address(token),
-            VERIFIER,
-            3_000 * UNIT,
-            dealDeadline,
-            keccak256("launch-campaign-v1")
+            address(token), VERIFIER, 3_000 * UNIT, dealDeadline, keccak256("launch-campaign-v1")
         );
 
         vm.startPrank(CUSTOMER);
         settlement.inviteProvider(
-            dealId,
-            DESIGNER,
-            800 * UNIT,
-            uint64(block.timestamp + 3 days),
-            keccak256("designer-private-terms")
+            dealId, DESIGNER, 800 * UNIT, uint64(block.timestamp + 3 days), keccak256("designer-private-terms")
         );
         settlement.inviteProvider(
-            dealId,
-            WRITER,
-            500 * UNIT,
-            uint64(block.timestamp + 3 days),
-            keccak256("writer-private-terms")
+            dealId, WRITER, 500 * UNIT, uint64(block.timestamp + 3 days), keccak256("writer-private-terms")
         );
         token.approve(address(settlement), 3_000 * UNIT);
         settlement.fundDeal(dealId);
@@ -68,12 +56,10 @@ contract PrivateProjectSettlementTest {
         vm.prank(WRITER);
         settlement.acceptObligation(dealId, 1);
 
-        bytes32 designHash = keccak256("encrypted-design-v1");
-        bytes32 copyHash = keccak256("encrypted-copy-v1");
         vm.prank(DESIGNER);
-        settlement.submitDeliverable(dealId, 0, designHash);
+        settlement.submitDeliverable(dealId, 0, keccak256("encrypted-design-v1"));
         vm.prank(WRITER);
-        settlement.submitDeliverable(dealId, 1, copyHash);
+        settlement.submitDeliverable(dealId, 1, keccak256("encrypted-copy-v1"));
 
         vm.prank(CUSTOMER);
         settlement.approveDeliverable(dealId, 0);
@@ -96,7 +82,7 @@ contract PrivateProjectSettlementTest {
         settlement.finalizeDeal(dealId);
 
         assertEq(token.balanceOf(CUSTOMER), 1_700 * UNIT, "surplus not refunded");
-        (, , , , , , , , , PrivateProjectSettlement.DealState state) = settlement.deals(dealId);
+        (, , , , , , , , , , PrivateProjectSettlement.DealState state) = settlement.deals(dealId);
         assertEq(uint256(state), uint256(PrivateProjectSettlement.DealState.Settled), "deal not settled");
     }
 
@@ -105,21 +91,13 @@ contract PrivateProjectSettlementTest {
 
         vm.prank(CUSTOMER);
         uint256 dealId = settlement.createDeal(
-            address(token),
-            VERIFIER,
-            3_000 * UNIT,
-            dealDeadline,
-            keccak256("replacement-demo")
+            address(token), VERIFIER, 3_000 * UNIT, dealDeadline, keccak256("replacement-demo")
         );
 
         uint64 providerDeadline = uint64(block.timestamp + 1 days);
         vm.startPrank(CUSTOMER);
         settlement.inviteProvider(
-            dealId,
-            WRITER,
-            500 * UNIT,
-            providerDeadline,
-            keccak256("original-writer-terms")
+            dealId, WRITER, 500 * UNIT, providerDeadline, keccak256("original-writer-terms")
         );
         token.approve(address(settlement), 3_000 * UNIT);
         settlement.fundDeal(dealId);
@@ -151,20 +129,12 @@ contract PrivateProjectSettlementTest {
     function testCannotPayWithOnlyOneApproval() public {
         vm.prank(CUSTOMER);
         uint256 dealId = settlement.createDeal(
-            address(token),
-            VERIFIER,
-            1_000 * UNIT,
-            uint64(block.timestamp + 4 days),
-            keccak256("two-party-approval")
+            address(token), VERIFIER, 1_000 * UNIT, uint64(block.timestamp + 4 days), keccak256("two-party-approval")
         );
 
         vm.startPrank(CUSTOMER);
         settlement.inviteProvider(
-            dealId,
-            DESIGNER,
-            1_000 * UNIT,
-            uint64(block.timestamp + 2 days),
-            keccak256("design-terms")
+            dealId, DESIGNER, 1_000 * UNIT, uint64(block.timestamp + 2 days), keccak256("design-terms")
         );
         token.approve(address(settlement), 1_000 * UNIT);
         settlement.fundDeal(dealId);
