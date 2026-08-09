@@ -22,6 +22,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install exact runtime
+        id: runtime
         working-directory: demo-foundry-e3
         run: |
           npm install --no-audit --no-fund
@@ -47,14 +48,20 @@ jobs:
             demo-foundry-e3/keyframes/*.png
           retention-days: 1
       - name: Publish render handle
-        if: success() && github.event_name == 'push'
+        if: always() && github.event_name == 'push'
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
           mkdir -p .render-status
           python3 - <<'PY'
           import json, os
-          meta=json.load(open('/tmp/render-meta.json'))
+          meta=None
+          try:
+              meta=json.load(open('/tmp/render-meta.json'))
+          except Exception:
+              pass
           out={
-            'status':'success',
+            'status':os.environ.get('JOB_STATUS','unknown'),
             'run_id':int(os.environ['GITHUB_RUN_ID']),
             'run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'head_sha':os.environ['GITHUB_SHA'],
@@ -66,5 +73,5 @@ jobs:
           git config user.name 'demo-foundry-render-bot'
           git config user.email 'demo-foundry-render-bot@users.noreply.github.com'
           git add .render-status/e3.json
-          git commit -m 'Record E3 render artifact handle'
+          git commit -m 'Record E3 render artifact handle' || true
           git push origin HEAD:demo-foundry-e3-threejs-20260809
