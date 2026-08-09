@@ -11,7 +11,7 @@ on:
       - 'demo-foundry-e3/**'
       - '.github/workflows/demo-foundry-e3-threejs.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -35,7 +35,7 @@ jobs:
       - name: Inspect output
         working-directory: demo-foundry-e3
         run: |
-          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json Interfold_E3_DemoFoundry053_ThreeJS.mp4
+          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json Interfold_E3_DemoFoundry053_ThreeJS.mp4 | tee /tmp/render-meta.json
           ls -lh Interfold_E3_DemoFoundry053_ThreeJS.mp4 Interfold_E3_DemoFoundry053_contact_sheet.jpg
       - uses: actions/upload-artifact@v4
         with:
@@ -46,3 +46,25 @@ jobs:
             demo-foundry-e3/Interfold_E3_DemoFoundry053_contact_sheet.jpg
             demo-foundry-e3/keyframes/*.png
           retention-days: 1
+      - name: Publish render handle
+        if: success() && github.event_name == 'push'
+        run: |
+          mkdir -p .render-status
+          python3 - <<'PY'
+          import json, os
+          meta=json.load(open('/tmp/render-meta.json'))
+          out={
+            'status':'success',
+            'run_id':int(os.environ['GITHUB_RUN_ID']),
+            'run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
+            'head_sha':os.environ['GITHUB_SHA'],
+            'artifact_name':'e3-demo-foundry-threejs',
+            'render_metadata':meta,
+          }
+          open('.render-status/e3.json','w').write(json.dumps(out,indent=2)+'\n')
+          PY
+          git config user.name 'demo-foundry-render-bot'
+          git config user.email 'demo-foundry-render-bot@users.noreply.github.com'
+          git add .render-status/e3.json
+          git commit -m 'Record E3 render artifact handle'
+          git push origin HEAD:demo-foundry-e3-threejs-20260809
