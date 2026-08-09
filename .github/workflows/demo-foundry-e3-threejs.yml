@@ -18,11 +18,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: demo-foundry-e3-threejs-20260809
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install exact runtime
-        id: runtime
         working-directory: demo-foundry-e3
         run: |
           npm install --no-audit --no-fund
@@ -39,6 +40,7 @@ jobs:
           ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json Interfold_E3_DemoFoundry053_ThreeJS.mp4 | tee /tmp/render-meta.json
           ls -lh Interfold_E3_DemoFoundry053_ThreeJS.mp4 Interfold_E3_DemoFoundry053_contact_sheet.jpg
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: e3-demo-foundry-threejs
           if-no-files-found: error
@@ -48,7 +50,7 @@ jobs:
             demo-foundry-e3/keyframes/*.png
           retention-days: 1
       - name: Publish render handle
-        if: always() && github.event_name == 'push'
+        if: always()
         env:
           JOB_STATUS: ${{ job.status }}
         run: |
@@ -62,6 +64,7 @@ jobs:
               pass
           out={
             'status':os.environ.get('JOB_STATUS','unknown'),
+            'event':os.environ.get('GITHUB_EVENT_NAME'),
             'run_id':int(os.environ['GITHUB_RUN_ID']),
             'run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT']),
             'head_sha':os.environ['GITHUB_SHA'],
