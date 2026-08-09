@@ -1,0 +1,148 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#070908}canvas{display:block;width:100%;height:100%}</style></head><body><canvas id="c"></canvas><script type="module">
+import * as THREE from './node_modules/three/build/three.module.js';
+
+const W=1280,H=720,FPS=24,DURATION=21,FRAMES=FPS*DURATION;
+const canvas=document.querySelector('#c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1);renderer.setSize(W,H,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x070908);
+const camera=new THREE.PerspectiveCamera(31,W/H,.1,100);camera.position.set(0,0,18);camera.lookAt(0,0,0);
+scene.add(new THREE.AmbientLight(0xe9eee9,0.82));const key=new THREE.DirectionalLight(0xf1f3ea,2.4);key.position.set(4,7,9);scene.add(key);const rim=new THREE.PointLight(0xb8ffd7,28,24,2);rim.position.set(-1,1.5,7);scene.add(rim);
+
+const C={bg:0x070908,white:0xe7ece7,muted:0x69716c,dim:0x242925,line:0x39413b,accent:0xb8ffd7,accent2:0x6fa789,warm:0xe9dfc8,danger:0xcf806d};
+const root=new THREE.Group();scene.add(root);
+
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const smooth=t=>t*t*(3-2*t);const ease=(t,a,b)=>smooth(clamp((t-a)/(b-a)));
+const pulse=(t,a,b)=>Math.sin(Math.PI*clamp((t-a)/(b-a)));
+
+function mat(color,opacity=1,emissive=0x000000,emissiveIntensity=0){return new THREE.MeshStandardMaterial({color,transparent:opacity<1,opacity,roughness:.62,metalness:.18,emissive,emissiveIntensity,depthWrite:opacity>.6});}
+function lineMat(color=C.line,opacity=1){return new THREE.LineBasicMaterial({color,transparent:true,opacity});}
+function box(w,h,d,color=C.dim,opacity=1){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,opacity));root.add(m);return m;}
+function plane(w,h,color=C.dim,opacity=1){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color,transparent:opacity<1,opacity,side:THREE.DoubleSide,depthWrite:false}));root.add(m);return m;}
+function ring(r,tube=.025,color=C.line,opacity=1){const m=new THREE.Mesh(new THREE.TorusGeometry(r,tube,8,96),new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}));root.add(m);return m;}
+function segment(a,b,color=C.line,opacity=1){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]);const l=new THREE.Line(g,lineMat(color,opacity));root.add(l);return l;}
+function dot(r=.08,color=C.white){const m=new THREE.Mesh(new THREE.SphereGeometry(r,20,20),mat(color,1,color,.28));root.add(m);return m;}
+function spriteText(text,{size=46,color='#e7ece7',mono=false,align='left',weight=600}={}){const cn=document.createElement('canvas');const ctx=cn.getContext('2d');const scale=2;ctx.font=`${weight} ${size*scale}px ${mono?'ui-monospace, SFMono-Regular, Menlo, monospace':'Inter, Arial, sans-serif'}`;const tw=Math.ceil(ctx.measureText(text).width)+40*scale;const th=Math.ceil(size*1.55*scale);cn.width=tw;cn.height=th;ctx.font=`${weight} ${size*scale}px ${mono?'ui-monospace, SFMono-Regular, Menlo, monospace':'Inter, Arial, sans-serif'}`;ctx.fillStyle=color;ctx.textBaseline='middle';ctx.textAlign=align;ctx.fillText(text,align==='center'?tw/2:20*scale,th/2);const tx=new THREE.CanvasTexture(cn);tx.colorSpace=THREE.SRGBColorSpace;tx.minFilter=THREE.LinearFilter;const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,transparent:true,depthWrite:false}));const aspect=tw/th;s.scale.set(aspect*size/85,size/85,1);root.add(s);return s;}
+function setOpacity(o,v){if(o.material)o.material.opacity=v;o.visible=v>.001;}
+function setScale(o,s){o.scale.setScalar(Math.max(.0001,s));}
+function lerp3(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function pos(o,p){o.position.set(...p);}
+
+// Persistent frame / editorial instrument
+const frame=plane(12.1,6.25,0x0c0f0d,.92);frame.position.z=-.65;
+const frameEdge=ring(.01);frameEdge.visible=false;
+const leftRule=segment([-2.8,-2.75,.1],[-2.8,2.75,.1],0x202621,.7);const rightRule=segment([3.15,-2.75,.1],[3.15,2.75,.1],0x202621,.7);
+const title=spriteText('E3 / ONE COMPUTATION',{size:25,color:'#dce2dd',mono:true,weight:650});pos(title,[-4.9,2.75,.45]);
+const chapter=spriteText('TEMPORARY ENCRYPTED EXECUTION',{size:16,color:'#707971',mono:true,weight:500});pos(chapter,[3.75,2.75,.45]);
+
+// Participants
+const bidders=[];const bidY=[1.45,0,-1.45];const bidNames=['BIDDER A','BIDDER B','BIDDER C'];
+for(let i=0;i<3;i++){const g=new THREE.Group();root.add(g);g.position.set(-4.65,bidY[i],.15);const shell=new THREE.Mesh(new THREE.BoxGeometry(1.35,.72,.24),mat(0x111512,1));g.add(shell);const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.35,.72,.24)),lineMat(0x38413a,.85));g.add(edge);const core=new THREE.Mesh(new THREE.BoxGeometry(.48,.24,.3),mat(i===1?C.warm:C.white,.93));g.add(core);core.position.x=.15;const lab=spriteText(bidNames[i],{size:14,color:'#8c958e',mono:true,weight:600});root.remove(lab);g.add(lab);lab.position.set(-.18,.58,.2);lab.scale.multiplyScalar(.7);bidders.push({g,shell,core,edge,lab});}
+const privateLabel=spriteText('PRIVATE INPUTS',{size:15,color:'#687169',mono:true});pos(privateLabel,[-4.65,-2.35,.35]);
+
+// E3 instrument
+const boundary=ring(2.08,.018,C.accent,.0);boundary.rotation.x=Math.PI/2;
+const inner=ring(1.47,.012,C.line,.0);inner.rotation.x=Math.PI/2;
+const requestNode=dot(.105,C.white);pos(requestNode,[0,0,.22]);
+const requestLabel=spriteText('REQUEST',{size:14,color:'#c9d0ca',mono:true});pos(requestLabel,[0,-.43,.4]);
+const committee=[];const committeeAngles=[.35,1.35,2.35,3.6,4.75];
+for(let i=0;i<5;i++){const a=committeeAngles[i],p=[Math.cos(a)*2.42,Math.sin(a)*2.42,.15];const d=dot(.09,C.muted);pos(d,p);const l=spriteText(`C${i+1}`,{size:12,color:'#758078',mono:true});pos(l,[p[0]*1.08,p[1]*1.08,.3]);committee.push({d,l,p});}
+const keyFragments=[];
+for(let i=0;i<5;i++){const a=committeeAngles[i];const p1=[Math.cos(a)*1.15,Math.sin(a)*1.15,.1],p2=[Math.cos(a+.45)*.7,Math.sin(a+.45)*.7,.15];keyFragments.push(segment(p1,p2,C.accent,0));}
+
+// Compute provider plane
+const compute=new THREE.Group();root.add(compute);compute.position.set(.2,0,.35);const cpBody=new THREE.Mesh(new THREE.BoxGeometry(2.1,1.22,.35),mat(0x101611,.9));compute.add(cpBody);const cpEdges=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.1,1.22,.35)),lineMat(C.accent,.35));compute.add(cpEdges);const cpLabel=spriteText('COMPUTE PROVIDER',{size:14,color:'#b6c1b9',mono:true});root.remove(cpLabel);compute.add(cpLabel);cpLabel.position.set(0,.0,.32);cpLabel.scale.multiplyScalar(.72);
+
+// Cipher objects
+const ciphers=[];
+for(let i=0;i<3;i++){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.22,1),mat(0x1b3227,1,C.accent,.12));root.add(m);m.visible=false;ciphers.push(m);}
+const resultCipher=new THREE.Mesh(new THREE.IcosahedronGeometry(.32,2),mat(0x183428,1,C.accent,.25));root.add(resultCipher);resultCipher.visible=false;
+
+// Verification gate to right of E3
+const gateL=box(.08,1.72,.2,0x38413b,1);const gateR=box(.08,1.72,.2,0x38413b,1);pos(gateL,[2.32,.9,.2]);pos(gateR,[2.32,-.9,.2]);
+const gateCore=box(.12,.18,.28,C.accent,1);pos(gateCore,[2.32,0,.3]);
+const verifyLabel=spriteText('VERIFYING…',{size:14,color:'#7d8980',mono:true});pos(verifyLabel,[2.52,-1.36,.38]);
+const proofSegments=[];const proofPts=[[1.8,0,.45],[.2,0,.55],[-1.0,.8,.42],[-1.0,-.8,.42],[-2.15,0,.32]];
+for(let i=0;i<proofPts.length-1;i++)proofSegments.push(segment(proofPts[i],proofPts[i+1],C.accent,0));
+
+// Threshold shares
+const shareLines=[];
+for(let i=0;i<5;i++)shareLines.push(segment(committee[i].p,[2.7,0,.3],C.accent,0));
+const thresholdLabel=spriteText('THRESHOLD  0 / 3',{size:14,color:'#7d8980',mono:true});pos(thresholdLabel,[2.5,-1.82,.38]);
+
+// Outcome/evidence region
+const outcomePanel=plane(2.22,4.7,0x0b0f0c,.0);pos(outcomePanel,[4.45,0,-.1]);
+const outRule=segment([3.35,-2.35,.1],[3.35,2.35,.1],0x354039,0);
+const outLabel=spriteText('PERMITTED RESULT',{size:14,color:'#7f8a82',mono:true});pos(outLabel,[4.33,1.78,.35]);
+const winner=spriteText('WINNER  B',{size:34,color:'#e4ebe5',mono:true,weight:700});pos(winner,[4.35,.82,.4]);
+const price=spriteText('CLEARING  82',{size:19,color:'#b8ffd7',mono:true,weight:650});pos(price,[4.35,.27,.4]);
+const proofLabel=spriteText('PROOF',{size:14,color:'#7f8a82',mono:true});pos(proofLabel,[4.12,-.72,.35]);
+const proofHash=spriteText('0x7E4A…91C2',{size:16,color:'#c4cbc5',mono:true});pos(proofHash,[4.38,-1.1,.35]);
+const finalA=spriteText('THE COMPUTATION PERSISTS.',{size:22,color:'#e4e9e4',weight:650});pos(finalA,[0,-2.32,.5]);
+const finalB=spriteText('THE AUTHORITY DOES NOT.',{size:22,color:'#b8ffd7',weight:650});pos(finalB,[0,-2.7,.5]);
+
+const phaseLabel=spriteText('',{size:15,color:'#b8ffd7',mono:true});
+
+function reset(){
+  // persistent baseline
+  camera.position.set(0,0,18);camera.lookAt(0,0,0);
+  setOpacity(boundary.material?boundary:boundary,0);setOpacity(inner,0);setOpacity(requestNode,0);setOpacity(requestLabel,0);
+  committee.forEach(x=>{setOpacity(x.d,.13);setOpacity(x.l,.18)});keyFragments.forEach(x=>setOpacity(x,0));
+  compute.visible=false;ciphers.forEach(x=>x.visible=false);resultCipher.visible=false;
+  [gateL,gateR,gateCore,verifyLabel,thresholdLabel].forEach(x=>setOpacity(x,0));proofSegments.forEach(x=>setOpacity(x,0));shareLines.forEach(x=>setOpacity(x,0));
+  [outcomePanel,outRule,outLabel,winner,price,proofLabel,proofHash,finalA,finalB].forEach(x=>setOpacity(x,0));
+  bidders.forEach((b,i)=>{b.g.visible=true;b.g.position.set(-4.65,bidY[i],.15);b.g.scale.setScalar(1);b.core.material.opacity=.92;b.shell.material.opacity=1;});setOpacity(privateLabel,1);
+}
+
+function animateFrame(frame){reset();const t=frame/FPS;
+  // subtle editorial camera, never wandering
+  camera.position.x=.10*Math.sin(t*.24);camera.position.y=.04*Math.sin(t*.18);camera.lookAt(0,0,0);
+
+  // 0-2 request: private actors + one request appears
+  let q=ease(t,.65,1.65);setOpacity(requestNode,q);setOpacity(requestLabel,q);setScale(requestNode,.2+.8*q);
+  requestNode.material.emissiveIntensity=.25+.7*pulse(t,.65,1.8);
+
+  // 2-5 authority instantiates, selected committee lights one-by-one
+  let auth=ease(t,2.0,4.55);setOpacity(boundary,.08+.72*auth);setOpacity(inner,.05+.25*auth);boundary.scale.setScalar(.15+.85*auth);inner.scale.setScalar(.45+.55*auth);
+  committee.forEach((x,i)=>{const a=ease(t,2.1+i*.27,2.8+i*.27);setOpacity(x.d,.13+.87*a);setOpacity(x.l,.18+.72*a);x.d.material.color.setHex(a>.7?C.accent:C.muted);});
+  keyFragments.forEach((x,i)=>setOpacity(x,.75*ease(t,3.05+i*.16,3.8+i*.16)));
+  if(t>3.1){requestLabel.material.map?.needsUpdate;}
+
+  // 5-8 encrypted entry. Original bid transforms at boundary into ciphertext object.
+  const targets=[[-1.75,.85,.32],[-1.75,0,.32],[-1.75,-.85,.32]];
+  bidders.forEach((b,i)=>{const a=ease(t,5+i*.45,6.15+i*.45);const p=lerp3([-4.65,bidY[i],.15],[-2.72,bidY[i]*.55,.15],a);b.g.position.set(...p);b.g.scale.setScalar(1-.34*a);b.core.material.opacity=.92*(1-a);b.shell.material.opacity=1-.65*a;const c=ciphers[i];if(a>.48){c.visible=true;const k=clamp((a-.48)/.52);const cp=lerp3([-2.68,bidY[i]*.55,.25],targets[i],k);pos(c,cp);c.rotation.set(t*.8+i,t*1.1+i*.5,t*.3);setScale(c,.55+.45*k);} });
+  if(t>7.15)bidders.forEach(b=>b.g.visible=false);
+
+  // 8-12 compute. Distinct provider is inside authority; committee stays outside.
+  const comp=ease(t,7.7,8.65);compute.visible=comp>.01;compute.scale.setScalar(.88+.12*comp);cpBody.material.opacity=.2+.7*comp;cpEdges.material.opacity=.1+.35*comp;cpLabel.material.opacity=comp;
+  ciphers.forEach((c,i)=>{if(t>=7.6){c.visible=true;const r=ease(t,8.25+i*.16,10.25+i*.16);const p=lerp3(targets[i],[-.45+(i*.45),(.5-i*.5),.5],r);pos(c,p);setScale(c,1-.48*r);c.rotation.y=t*1.6;}});
+  if(t>9.4){resultCipher.visible=true;const r=ease(t,9.5,11.35);pos(resultCipher,lerp3([.65,0,.5],[2.02,0,.42],r));resultCipher.rotation.y=t*1.4;setScale(resultCipher,.2+.8*r);resultCipher.material.opacity=r;}
+
+  // 12-15 verification = hard stop, proof races backward, gate only opens after causal trace.
+  const vg=ease(t,11.45,12.0);[gateL,gateR,gateCore].forEach(x=>setOpacity(x,vg));setOpacity(verifyLabel,vg*(1-ease(t,14.0,14.55)));
+  if(t>=11.4){resultCipher.visible=true;pos(resultCipher,[2.02,0,.42]);}
+  proofSegments.forEach((s,i)=>setOpacity(s,.95*ease(t,12.15+i*.30,12.78+i*.30)));
+  const verified=ease(t,13.72,14.35);gateL.position.y=.9+.47*verified;gateR.position.y=-.9-.47*verified;gateCore.scale.x=.15+(1-.15)*(1-verified);gateCore.material.emissiveIntensity=.35+1.4*verified;
+  if(t>14.25){verifyLabel.material.opacity=0;}
+
+  // 15-18 threshold: shares arrive sequentially. Only third resolves result.
+  const th=ease(t,14.5,15.0);setOpacity(thresholdLabel,th*(1-ease(t,17.55,18.0)));let count=0;
+  [0,2,4].forEach((idx,j)=>{const a=ease(t,15.0+j*.72,15.62+j*.72);setOpacity(shareLines[idx],.9*a);if(a>.85)count++;});
+  // recreate threshold label texture only on deterministic count changes
+  const ctx=thresholdLabel.material.map.image.getContext('2d');const cn=thresholdLabel.material.map.image;ctx.clearRect(0,0,cn.width,cn.height);ctx.font='600 28px ui-monospace, monospace';ctx.fillStyle='#7d8980';ctx.textBaseline='middle';ctx.fillText(`THRESHOLD  ${count} / 3`,40,cn.height/2);thresholdLabel.material.map.needsUpdate=true;
+  const unlock=ease(t,16.55,17.55);resultCipher.material.emissiveIntensity=.25+1.8*unlock;setScale(resultCipher,1+.18*pulse(t,16.7,17.55));
+
+  // 18-21 permitted result leaves; authority reverses formation topology and disappears.
+  const out=ease(t,17.45,18.3);[outcomePanel,outRule,outLabel,winner,price,proofLabel,proofHash].forEach(x=>setOpacity(x,out));
+  if(t>=17.45){resultCipher.visible=true;const p=lerp3([2.02,0,.42],[3.47,.82,.42],out);pos(resultCipher,p);setScale(resultCipher,1-.82*out);resultCipher.material.opacity=1-out;}
+  const die=ease(t,18.05,20.0);setOpacity(boundary,.8*(1-die));setOpacity(inner,.3*(1-die));boundary.scale.setScalar(1-.84*die);inner.scale.setScalar(1-.7*die);keyFragments.forEach((x,i)=>setOpacity(x,.75*(1-ease(t,18.1+i*.10,19.1+i*.10))));committee.forEach((x,i)=>{const a=ease(t,18.25+i*.12,19.45+i*.12);setOpacity(x.d,1-a);setOpacity(x.l,.9*(1-a));});compute.visible=t<18.6;compute.scale.setScalar(Math.max(.001,1-ease(t,18.0,18.6)));
+  ciphers.forEach(c=>{if(t>17.8)c.visible=false;});proofSegments.forEach(s=>setOpacity(s,.95*(1-ease(t,18.0,18.45))));shareLines.forEach(s=>setOpacity(s,.9*(1-ease(t,17.8,18.3))));[gateL,gateR,gateCore].forEach(x=>setOpacity(x,1-ease(t,17.9,18.45)));setOpacity(requestNode,1-die);setOpacity(requestLabel,1-die);
+  const final=ease(t,19.05,19.8);setOpacity(finalA,final);setOpacity(finalB,final);setOpacity(privateLabel,1-ease(t,17.5,18.5));
+
+  renderer.render(scene,camera);
+}
+
+window.setFrame=(f)=>{animateFrame(Math.max(0,Math.min(FRAMES-1,Number(f)||0)));return true};window.__meta={W,H,FPS,DURATION,FRAMES};window.__ready=true;animateFrame(0);
+</script></body></html>
