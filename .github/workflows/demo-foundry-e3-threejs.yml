@@ -1,0 +1,48 @@
+name: Demo Foundry E3 Three.js Render
+on:
+  push:
+    branches: [demo-foundry-e3-threejs-20260809]
+    paths:
+      - 'demo-foundry-e3/**'
+      - '.github/workflows/demo-foundry-e3-threejs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'demo-foundry-e3/**'
+      - '.github/workflows/demo-foundry-e3-threejs.yml'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact runtime
+        working-directory: demo-foundry-e3
+        run: |
+          npm install --no-audit --no-fund
+          node -e "import('three').then(m=>{console.log('three revision',m.REVISION); if(m.REVISION!=='185') process.exit(9)})"
+      - name: Install Chromium
+        working-directory: demo-foundry-e3
+        run: npx playwright install --with-deps chromium
+      - name: Render deterministic film
+        working-directory: demo-foundry-e3
+        run: node render.mjs
+      - name: Inspect output
+        working-directory: demo-foundry-e3
+        run: |
+          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json Interfold_E3_DemoFoundry053_ThreeJS.mp4
+          ls -lh Interfold_E3_DemoFoundry053_ThreeJS.mp4 Interfold_E3_DemoFoundry053_contact_sheet.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e3-demo-foundry-threejs
+          if-no-files-found: error
+          path: |
+            demo-foundry-e3/Interfold_E3_DemoFoundry053_ThreeJS.mp4
+            demo-foundry-e3/Interfold_E3_DemoFoundry053_contact_sheet.jpg
+            demo-foundry-e3/keyframes/*.png
+          retention-days: 1
